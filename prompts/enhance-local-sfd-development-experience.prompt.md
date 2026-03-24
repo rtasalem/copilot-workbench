@@ -633,4 +633,3 @@ Add the following sections to the README (adapt to the service's existing struct
 - If `.vscode/tasks.json` already exists, merge the new tasks in
 - All file contents should use ES module syntax and match the project's existing formatting style
 - The service name used in Docker compose project names (`-p` flag) and `compose.debug.yaml` must match what's in the existing `compose.yaml`
-
