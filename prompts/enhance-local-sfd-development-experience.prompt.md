@@ -117,9 +117,9 @@ Create `.vscode/tasks.json` with this content (adapt the script names to match t
 ```
 
 ### 5. Enable pre-commit hooks
-Check if a `.pre-commit-config.yaml` file exists in the project root.
+Check if a `.pre-commit-config.yaml` or `.pre-commit-config.yml` file exists in the project root.
 
-**If it does NOT exist**, create `.pre-commit-config.yaml` with the following exact contents:
+**If it does NOT exist**, create the file and use either the `.yaml` or `.yml` extension depending on the chosen pattern within the project. The file should then have the following exact contents:
 ```yaml
 repos:
 - repo: https://github.com/Yelp/detect-secrets
@@ -141,7 +141,7 @@ repos:
 - Ensure hooks are properly indented (hooks list items should be 4-space indented under their repo)
 - Add the local `eslint-fix` hook block (shown above) if not already present
 
-After creating or updating the file, run `pre-commit install` in the terminal to activate the hooks for the local repository.
+After creating or updating the file, run `pre-commit install` (or `pre-commit install --config .pre-commit-config.yml` if the file extension used is `.yml`) in the terminal to activate the hooks for the local repository.
 
 ### 6. Create SonarQube Cloud local scan script
 Create the `scripts/` directory if it doesn't exist, then create `scripts/sonar-scan.js` with the following exact contents:
@@ -579,6 +579,32 @@ In `.github/workflows/check-pull-request.yml`, find the SonarQube scan step and 
 ```yaml
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   SONAR_SCANNER_OPTS: "-Dsonar.verbose=true"
+```
+Check if `.github/workflows/pr-approval-bot.yml` already exists, if not create the file with the following contents:
+```yaml
+name: PR Approval Bot
+
+on:
+  pull_request_review:
+    types: [submitted]
+
+jobs:
+  comment-on-approval:
+    if: github.event.review.state == 'approved'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Post a comment on approval
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          issue-number: ${{ github.event.pull_request.number }}
+          body: |
+            **Your PR is now approved 🎉**  
+            Before merging, be sure to include `#patch` or `#major` in your commit message if merging either a patch or major version.  
+            This will ensure CDP deploys the correct version.  
+            If merging a minor version, nothing needs to be done as these are automatically handled and deployed by CDP.  
+            Full details can be found in the CDP documentation.  
+            Thank you. 👍
 ```
 
 ### 8. Update README.md
