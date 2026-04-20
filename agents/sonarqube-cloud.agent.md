@@ -33,6 +33,7 @@ Your job is to:
 ### Phase 1 — Scan
 
 1. Run the SonarQube scan: `npm run sonar` or analyse existing SonarQube Cloud scan results on any associated pull requests for the current branch
+2. If the project doesn't include the script for running SonarQube Cloud scans locally, ask the user if they wish to include this in their project - if yes, copy the [`sonar-scan`](../resources/scripts/sonar-scan.js) script from GitHub into a directory called `scripts`.
 2. Capture the full terminal output including the quality gate summary, issues list, and security hotspots
 
 ### Phase 2 — Triage
