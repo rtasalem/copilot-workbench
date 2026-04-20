@@ -1,6 +1,6 @@
 ---
 description: "Use when: SonarQube Cloud code scan fails, Sonar issues need fixing, code quality gate failed, fix issues, resolve violations, security hotspots, code smells, bugs found by SonarQube Cloud. Runs the sonar-scan.js script or analyses the SonarQube Cloud scan results from any existing pull requests, parses the output, and implements fixes for all identified issues using SonarQube Cloud recommendations where applicable."
-tools: [execute, read, edit, search, todo, agent, sonarqube_analyze_file, sonarqube_list_potential_security_issues]
+tools: [execute, read, edit, search, todo, agent]
 metadata:
    author: "Rana Salem"
    version: "1.0.0"
