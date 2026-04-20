@@ -1,155 +1,7 @@
-# Reusable Copilot Prompt: Enhance Local Dev Experience
-
-Copy the following prompt and use it in each Single Front Door (SFD) service repo. Replace `{SERVICE_NAME}` with the actual service name (e.g., `fcp-sfd-object-processor`, `fcp-sfd-frontend`).
-
----
-
-**Prompt:**
-
-Apply the following local development experience enhancements to this service (`{SERVICE_NAME}`). All changes should follow ES module conventions (`"type": "module"`) and use neostandard formatting. Make each change exactly as specified:
-
-### 1. Migrate linter from standard to neostandard
-- Remove `standard` from `devDependencies` in `package.json` by running `npm uninstall standard`
-- Ensure the `package.json` is up to date by running `npm install` followed by `npm audit`
-- Based on the result of the `npm audit`, apply any fixes necessary
-- Add `"eslint": "9.39.4"` and `"neostandard": "0.13.0"` to `devDependencies` by running `npm install -D neostandard eslint`
-- Create `eslint.config.js` in the project root with this exact content by running `npx neostandard --esm > eslint.config.js`
-- In `package.json` scripts, remove any `pretest` script that references `test:lint` and remove the `test:lint` script itself
-- Add these scripts:
-  - `"lint": "npx eslint . --ext .js"`
-  - `"lint:fix": "npx eslint . --ext .js --fix"`
-
-### 2. Add convenience Docker npm scripts
-Add these scripts to `package.json` (preserve all existing scripts):
-- `"docker:build": "docker compose build"`
-- `"docker:dev": "docker compose up"`
-- `"docker:dev:d": "docker compose up -d"`
-- `"docker:stop": "docker compose down"`
-- `"docker:stop:v": "docker compose down -v"`
-- `"docker:debug": "docker compose -f compose.yaml -f compose.debug.yaml -p '{SERVICE_NAME}' up"`
-
-Also add a `start:debug` script:
-- `"start:debug": "nodemon --watch src --exec 'node --experimental-vm-modules --inspect-brk=0.0.0.0 src/index.js'"`
-
-And a sonar scan script:
-- `"sonar": "node scripts/sonar-scan.js"`
-
-### 3. Create Docker debug compose override
-Create `compose.debug.yaml` in the project root:
-```yaml
-services:
-  {SERVICE_NAME}:
-    command: npm run start:debug
-```
-
-### 4. Create VS Code tasks
-Create `.vscode/tasks.json` with this content (adapt the script names to match the npm scripts above):
-```json
-{
-  "version": "2.0.0",
-  "tasks": [
-    {
-      "type": "npm",
-      "label": "🛠️ Build Docker container",
-      "script": "docker:build"
-    },
-    {
-      "type": "npm",
-      "label": "🏁 Start Docker container",
-      "script": "docker:dev",
-      "problemMatcher": []
-    },
-    {
-      "type": "npm",
-      "label": "✂️ Start Docker container (detached mode)",
-      "script": "docker:dev:d",
-      "problemMatcher": []
-    },
-    {
-      "type": "npm",
-      "label": "🛑 Stop Docker container",
-      "script": "docker:stop",
-      "problemMatcher": []
-    },
-    {
-      "type": "npm",
-      "label": "😵 Stop Docker container + delete volumes",
-      "script": "docker:stop:v",
-      "problemMatcher": []
-    },
-    {
-      "type": "npm",
-      "label": "🧪 Run tests",
-      "script": "docker:test",
-      "problemMatcher": []
-    },
-    {
-      "type": "npm",
-      "label": "👀 Run tests (watch mode)",
-      "script": "docker:test:watch"
-    },
-    {
-      "type": "npm",
-      "label": "🪲 Run debugger",
-      "script": "docker:debug",
-      "problemMatcher": []
-    },
-    {
-      "type": "npm",
-      "label": "📋 Run linter",
-      "script": "lint",
-      "problemMatcher": []
-    },
-    {
-      "type": "npm",
-      "label": "🧹 Run linter + auto fix known issues",
-      "script": "lint:fix",
-      "problemMatcher": []
-    },
-    {
-      "type": "npm",
-      "label": "☁️ SonarQube Cloud scan",
-      "script": "sonar",
-      "problemMatcher": []
-    }
-  ]
-}
-```
-
-### 5. Enable pre-commit hooks
-Check if a `.pre-commit-config.yaml` or `.pre-commit-config.yml` file exists in the project root.
-
-**If it does NOT exist**, create the file and use either the `.yaml` or `.yml` extension depending on the chosen pattern within the project. The file should then have the following exact contents:
-```yaml
-repos:
-- repo: https://github.com/Yelp/detect-secrets
-  rev: v1.5.0
-  hooks:
-    - id: detect-secrets
-      args: ['--baseline', '.secrets.baseline']
-
-- repo: local
-  hooks:
-    - id: eslint-fix
-      name: ESLint with neostandard
-      entry: npm run lint:fix
-      language: node
-```
-
-**If it already exists**, apply these modifications:
-- Bump `detect-secrets` rev to `v1.5.0` if it is an older version
-- Ensure hooks are properly indented (hooks list items should be 4-space indented under their repo)
-- Add the local `eslint-fix` hook block (shown above) if not already present
-
-After creating or updating the file, run `pre-commit install` (or `pre-commit install --config .pre-commit-config.yml` if the file extension used is `.yml`) in the terminal to activate the hooks for the local repository.
-
-### 6. Create SonarQube Cloud local scan script
-Create the `scripts/` directory if it doesn't exist, then create `scripts/sonar-scan.js` with the following exact contents:
-```js
-import { readFile } from 'node:fs/promises'
+import { readFileSync } from 'node:fs'
 import { execFileSync, spawn } from 'node:child_process'
-import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
+import dotenv from 'dotenv'
 
 const SONARCLOUD_BASE_URL = 'https://sonarcloud.io'
 const BORDER = '═'.repeat(51)
@@ -190,51 +42,6 @@ const COMPARATOR_SYMBOLS = {
   NE: '≠'
 }
 
-const parseDotEnv = async (filePath) => {
-  const vars = {}
-
-  try {
-    const content = await readFile(filePath, 'utf8')
-
-    for (const line of content.split('\n')) {
-      const trimmed = line.trim()
-
-      if (!trimmed || trimmed.startsWith('#')) continue
-
-      const eqIndex = trimmed.indexOf('=')
-
-      if (eqIndex === -1) continue
-
-      const key = trimmed.slice(0, eqIndex).trim()
-      const value = trimmed.slice(eqIndex + 1).trim().replace(/^["']|["']$/g, '')
-      vars[key] = value
-    }
-  } catch {
-    // .env file not found or unreadable — continue with process.env only
-  }
-
-  return vars
-}
-
-const parseSonarProperties = async (filePath) => {
-  const props = {}
-  const content = await readFile(filePath, 'utf8')
-
-  for (const line of content.split('\n')) {
-    const trimmed = line.trim()
-
-    if (!trimmed || trimmed.startsWith('#')) continue
-
-    const eqIndex = trimmed.indexOf('=')
-
-    if (eqIndex === -1) continue
-
-    props[trimmed.slice(0, eqIndex).trim()] = trimmed.slice(eqIndex + 1).trim()
-  }
-
-  return props
-}
-
 const getCurrentBranch = () =>
   execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { encoding: 'utf8' }).trim()
 
@@ -256,13 +63,30 @@ const runScanner = (sonarToken, cwd, branch) =>
       '-Dsonar.verbose=true'
     ]
 
-    const child = spawn('docker', args, { stdio: 'inherit' })
+    const frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
+    const message = 'Code scan in progress using sonar-scanner-cli (to view logs in real-time a Docker client can be used e.g. Docker Desktop)'
+    let i = 0
 
-    child.on('error', reject)
+    const spinner = setInterval(() => {
+      process.stdout.write(`\r ${frames[i++ % frames.length]} ${message}`)
+    }, 80)
+
+    const child = spawn('docker', args, { stdio: 'ignore' })
+
+    child.on('error', (err) => {
+      clearInterval(spinner)
+      process.stdout.write('\r')
+      reject(err)
+    })
     // Always resolve with the exit code — a non-zero exit may simply mean the
     // quality gate failed (analysis was still uploaded). We check the gate
     // status via the API after the scan and exit accordingly.
-    child.on('close', resolve)
+    child.on('close', (code) => {
+      clearInterval(spinner)
+      process.stdout.write(`\r ${message}\n`)
+      console.log('\n ✔ Code scan complete. See below for the results.\n')
+      resolve(code)
+    })
   })
 
 const sonarcloudFetch = async (path, sonarToken) => {
@@ -490,9 +314,8 @@ const sonarScan = async () => {
   const cwd = resolve('.')
 
   // Load .env if present (mirrors `source .env` from the old npm script)
-  const envPath = resolve(cwd, '.env')
-  const envVars = existsSync(envPath) ? await parseDotEnv(envPath) : {}
-  const sonarToken = envVars.SONAR_TOKEN ?? process.env.SONAR_TOKEN
+  dotenv.config()
+  const sonarToken = process.env.SONAR_TOKEN
 
   if (!sonarToken) {
     console.error(
@@ -504,7 +327,7 @@ const sonarScan = async () => {
 
   // Read project config from sonar-project.properties
   const propsPath = resolve(cwd, 'sonar-project.properties')
-  const props = await parseSonarProperties(propsPath)
+  const props = dotenv.parse(readFileSync(propsPath))
   const projectKey = props['sonar.projectKey']
 
   if (!projectKey) {
@@ -572,64 +395,3 @@ sonarScan().catch((err) => {
   console.error(`\nSonar scan failed: ${err.message}`)
   process.exit(1)
 })
-```
-
-### 7. Update CI workflow
-In `.github/workflows/check-pull-request.yml`, find the SonarQube scan step and add these environment variables if not already present:
-```yaml
-  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  SONAR_SCANNER_OPTS: "-Dsonar.verbose=true"
-```
-Check if `.github/workflows/pr-approval-bot.yml` already exists, if not create the file with the following contents:
-```yaml
-name: PR Approval Bot
-
-on:
-  pull_request_review:
-    types: [submitted]
-
-jobs:
-  comment-on-approval:
-    if: github.event.review.state == 'approved'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Post a comment on approval
-        uses: peter-evans/create-or-update-comment@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          issue-number: ${{ github.event.pull_request.number }}
-          body: |
-            **Your PR is now approved 🎉**  
-            Before merging, be sure to include `#patch` or `#major` in your commit message if merging either a patch or major version.  
-            This will ensure CDP deploys the correct version.  
-            If merging a minor version, nothing needs to be done as these are automatically handled and deployed by CDP.  
-            Full details can be found in the CDP documentation.  
-            Thank you. 👍
-```
-
-### 8. Update README.md
-Add the following sections to the README (adapt to the service's existing structure):
-
-**SonarQube Cloud token section** (under Prerequisites):
-- Explain that `npm run sonar` enables local SonarQube Cloud scanning
-- Link to SonarQube Cloud login, instruct user to generate a personal token under My Account → Security → Generate Tokens
-- Tell user to add `SONAR_TOKEN` to their `.env`
-
-**Pre-commit Hooks section**:
-- Explain this repo includes pre-commit hooks: `detect-secrets` and `eslint-fix` (ESLint + neostandard with `--fix`)
-- Note that committing via command line shows full hook output
-- Inform that Python and its package manager pip need to be install and provide install instructions: `pip3 install pre-commit`
-
-**VS Code tasks note**:
-- Mention that VS Code users can access tasks via Command Palette → Tasks: Run Task
-- Key combo: `Ctrl+Shift+P` (Windows) / `Cmd+Shift+P` (Mac)
-
-**Update existing build/run/test sections** to reference the new npm scripts as alternatives to raw Docker Compose commands. Fix any references from `standard` to `neostandard` and from `test:lint` to `lint`.
-
-### Important notes
-- Do NOT modify any application source code, only tooling/config files
-- Keep all existing `docker:test` and `docker:test:watch` scripts unchanged (they use service-specific project names and compose files)
-- If a `compose.debug.yaml` already exists, merge rather than overwrite
-- If `.vscode/tasks.json` already exists, merge the new tasks in
-- All file contents should use ES module syntax and match the project's existing formatting style
-- The service name used in Docker compose project names (`-p` flag) and `compose.debug.yaml` must match what's in the existing `compose.yaml`
